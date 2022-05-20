@@ -1,0 +1,255 @@
+Sub Main()
+
+' Z- Probing Script
+' TobiSchroedel
+
+
+
+Dim FRate1, FRate2, FRate3
+Dim ToolNo
+Dim ToolD
+Dim ToolR
+Dim ToolXInc
+Dim ToolDesc
+Dim ZTrav
+Dim ZHit
+Dim Zstart
+Dim ZScale
+Dim WZL 	'gemessene Werkzeug Länge
+Dim Gefahren 	'gefahrene strecke
+Dim SpindelOff
+'Dim ProbeZ
+
+'Init vars
+WZL = 0
+Gefahren = 0
+FRate1 = 500	'Schnelles Tasten
+FRate2 = 50	'Langsammes Tasten
+FRate3 = 6000 	'Vorschub in X und Y, Und in Z+
+ZTrav = 1000  	'maximaler verfahrweg in Z zu Tastplatte
+SpindelOff = 322.245 'Spindeloffset am anfang 322.02 wenn WZ Länge negativ, abweichung ohne vorzeichen draufrechnen
+
+ToolNo = GetOEMDRO(824) 'GetCurrentTool()
+ToolD = GetToolParam(ToolNo,1)
+ToolR = ToolD/2
+ToolXInk = ToolR-8
+ToolDesc = GetToolDesc(ToolNo)
+
+
+'Temporary save all Axis Scale factors
+ZScale = GetOEMDRO(61)
+
+'Set Z Scale to 1
+SetOEMDRO(61,1)
+Sleep(250)
+
+'Check for Errors
+
+'Check if Maschine is Reverenced
+If GetOEMLed(807) Then 'X Achse
+	DoOEMButton(1003) 'Stop
+	DoOEMButton(1002) 'G-Code Rewind
+	Sleep(150)
+	Message( "X Achse nicht reverenziert" )
+	Sleep(150)
+	End
+End If
+
+If GetOEMLed(808) Then 'Y Achse
+	DoOEMButton(1003) 'Stop
+	DoOEMButton(1002) 'G-Code Rewind
+	Sleep(150)
+	Message( "Y Achse nicht reverenziert" )
+	Sleep(150)
+	End
+End If
+
+If GetOEMLed(809) Then 'Z Achse
+	DoOEMButton(1003) 'Stop
+	DoOEMButton(1002) 'G-Code Rewind
+	Sleep(150)
+	Message( "Z Achse nicht reverenziert" )
+	Sleep(150)
+	End
+End If
+
+If GetOEMLed(810) Then 'A Achse
+	DoOEMButton(1003) 'Stop
+	DoOEMButton(1002) 'G-Code Rewind
+	Sleep(150)
+	Message( "A Achse nicht reverenziert" )
+	Sleep(150)
+	End
+End If
+
+If GetOEMLed(811) Then 'B Achse
+	DoOEMButton(1003) 'Stop
+	DoOEMButton(1002) 'G-Code Rewind
+	Sleep(150)
+	Message( "B Achse nicht reverenziert" )
+	Sleep(150)
+	End
+End If
+
+'check is the Spindel Running
+If GetOEMLed(11) Then 
+	DoOEMButton(1003) 'Stop
+	DoOEMButton(1002) 'G-Code Rewind
+	Sleep(150)
+	Message( "Spindel ist an - Messung gestoppt" )
+	Sleep(150)
+	End
+End If
+
+' Check for Machine Coordinates
+If GetOemLED(16)<>0 Then 
+Message "Please change to working coordinates"
+SetOEMDRO(61,ZScale)
+Sleep(250)
+Exit Sub ' Exit if in Machine Coordinates
+End If
+
+'Check Probe is active
+If GetOemLED(825)<>0 Then
+Message "Probe is active! Check connection and try again"
+Call SetOEMDRO(61,ZScale)
+Sleep(250)
+Exit Sub ' Exit if probe is tripped
+End If
+
+
+
+
+'main working
+	
+	'Fahre zu Taster Possition
+	Code "F" & FRate3
+	Sleep(125)
+	Code "G90 G53 G01 Z-15"
+	While IsMoving()
+	Wend
+	Code "G90 G53 G01 A0"
+	While IsMoving()
+	Wend
+	Code "G90 G53 G01 X-19 Y-1718" 'X-19 Y-1718
+	While IsMoving()
+	Wend
+	
+	'##################################### Abfrage Quer Versatz Bei Tool D Gröser 15 (Durchmesser Tastkopf) #######################################################
+
+
+If ToolD > 15 Then
+	MachMsg("Maschine korrigiert Versatz nach OK", "Achtung WZ Durchmesser zu Groß", 0)
+	Sleep(250)
+	Code "G91 G01 X-" & ToolXInk & "F" & FRate1
+	While IsMoving()
+	Wend
+	MachMsg("Schneide manuell über Taster drehen und bestätigen", "Achtung WZ Durchmesser zu Groß", 0)
+	Sleep(250)
+End If
+	
+	'##################################### Ende Abfrage Quer Versatz  #######################################################	
+	
+	
+	
+	'Save Z Pos für Berechnug WZL
+	ZStart = GetOEMDRO(85) 'ABS Koordinate Start
+	
+	 
+	
+	'############################################## Probe Z- ########################################################	
+	
+	'Fast Probe Z
+	Code "G91"
+	Code "F" & FRate1
+	Sleep(125)
+	Call WaitProbeReady()	
+	Code "G31 Z-" & ZTrav
+	While IsMoving()
+	Wend
+
+	
+	'Move back
+	Code "F" & FRate1
+	Code "G91 G01 Z5"
+	While IsMoving()
+	Wend
+	
+		
+	'Latch Probe Z
+	Code "F" & FRate2
+	Sleep(125)
+	Code "G31 Z-10" 
+	While IsMoving()
+	Wend
+	Sleep(125)
+	
+	'Save result
+	ZHit = GetOEMDRO(85) 'ABS Koordinate Hit
+ 
+	'Move back
+	Code "F" & FRate2
+	Code "G91 G01 Z2"
+	While IsMoving()
+	Wend
+	
+	
+	'################################################# Berechnung WZ Länge #########################################
+	
+	
+	Gefahren = ZStart - ZHit 'berechnug gefahrene mm ab Absolutem Startpunkt zb: (-15) - (-150) = +135
+	WZL = SpindelOff - Gefahren ' 322.02 Länge Spndel ohne Werkzeug also 0
+	WZL = nFmt(WZL, 3) 'runden auf 3 Nachkomma stellen
+	If ZHit=999999 Then 
+		Exit Sub 
+	End If
+	
+	
+	'Message "ZStart: " & ZStart
+	'Sleep(250)
+	'Message "ZHit: " & ZHit
+	'Sleep(250)
+	'Message "gefahrene strecke: " & Gefahren
+	'Sleep(250)
+	'Message "Spindeloffset: " & SpindelOff
+	'Sleep(250)
+	'Message "Gemessene Werkzeug Länge: " & WZL
+	'Sleep(250)
+	'Message "WKZ Nummer: " & ToolNo
+	'Sleep(250)
+	Message "Werkzeug #" & ToolDesc & "# mit Nummer #" & ToolNo & "# hat gemessene Länge #" & WZL & "#"
+	Sleep(250)
+	SetToolParam(ToolNo, 2, WZL)' wert in Tabelle schreiben
+	Sleep(250)
+	Code "G90 G53 G01 Z-15 F" & FRate3 'Fahre mit Z weg
+	While IsMoving()
+		Sleep(100)
+	Wend
+
+
+
+'epilog
+
+SetOEMDRO(61,ZScale)
+Sleep(250)
+
+Code "G43" 'Längenversatz aktivieren
+
+End Sub '################################# Ende Hautpscript ##########################################################
+
+
+'Functions
+
+   
+Sub WaitProbeReady()
+	While GetOemLED(825)
+		Sleep(100)
+	Wend
+End Sub
+
+   
+
+                
+
+              
+   
