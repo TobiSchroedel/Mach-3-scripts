@@ -1,0 +1,445 @@
+Sub Main()
+
+' X-Y+ Outside Probing Script
+' Author Schrödel
+
+
+
+Dim FRate1, FRate2, FRate3
+Dim ToolNo
+Dim ToolD
+Dim ToolR
+
+Dim Breite
+Dim Diam
+Dim Latch
+Dim DMax 
+
+Dim APos
+
+Dim XStartABS
+Dim XEndABS
+Dim XHit
+Dim XSoll
+Dim XVersInk
+Dim XScale
+Dim XAbst
+
+Dim YStartABS
+Dim YEndABS
+Dim YHit
+Dim YSoll
+Dim YVersInk
+Dim YScale
+Dim YAbst
+
+Dim ZStartABS
+Dim ZHit
+Dim ZScale
+Dim ZSaveInk
+
+'Init vars
+FRate1 = 400'abs(GetUserDRO(1821))
+FRate2 = 50
+FRate3 = 150
+ToolNo = GetCurrentTool()
+ToolD = GetToolParam(ToolNo,1)
+ToolR = ToolD/2
+APos = GetOEMDRO(86) 'Maschienen Koordinaten A-Achse
+Latch = 5 'Lücke
+DMax = 50 'Maximaler Tastweg
+
+XSoll = GetUserDRO(2200)
+YSoll = GetUserDRO(2201)
+XAbst = Abs(GetUserDRO(2202))
+YAbst = Abs(GetUserDRO(2203))
+Breite = Abs(GetUserDRO(2204))
+Diam = Abs(GetUserDRO(2205))
+ZSaveInk = Abs(GetUserDRO(2206))
+
+
+'Temporary save all Axis Scale factors
+XScale = GetOEMDRO(59)
+YScale = GetOEMDRO(60)
+ZScale = GetOEMDRO(61)
+
+'Set All Axis' Scale to 1
+SetOEMDRO(59,1)
+SetOEMDRO(60,1)
+SetOEMDRO(61,1)
+Sleep(250)
+
+
+'Check for Errors
+
+'Check if Maschine is Reverenced
+If GetOEMLed(807) Then 'X Achse
+	DoOEMButton(1003) 'Stop
+	DoOEMButton(1002) 'G-Code Rewind
+	Sleep(150)
+	Message( "X Achse nicht reverenziert" )
+	Sleep(150)
+	End
+End If
+
+If GetOEMLed(808) Then 'Y Achse
+	DoOEMButton(1003) 'Stop
+	DoOEMButton(1002) 'G-Code Rewind
+	Sleep(150)
+	Message( "Y Achse nicht reverenziert" )
+	Sleep(150)
+	End
+End If
+
+If GetOEMLed(809) Then 'Z Achse
+	DoOEMButton(1003) 'Stop
+	DoOEMButton(1002) 'G-Code Rewind
+	Sleep(150)
+	Message( "Z Achse nicht reverenziert" )
+	Sleep(150)
+	End
+End If
+
+If GetOEMLed(810) Then 'A Achse
+	DoOEMButton(1003) 'Stop
+	DoOEMButton(1002) 'G-Code Rewind
+	Sleep(150)
+	Message( "A Achse nicht reverenziert" )
+	Sleep(150)
+	End
+End If
+
+If GetOEMLed(811) Then 'B Achse
+	DoOEMButton(1003) 'Stop
+	DoOEMButton(1002) 'G-Code Rewind
+	Sleep(150)
+	Message( "B Achse nicht reverenziert" )
+	Sleep(150)
+	End
+End If
+
+If GetOEMDRO(824)<>1 Then
+	Message "Taster nicht in Spindel, Vorgang Abgebrochen."
+	Call SetOEMDRO(59,XScale)
+	Call SetOEMDRO(60,YScale)
+	Call SetOEMDRO(61,ZScale)
+	Sleep(250)
+	Exit Sub
+End If
+
+If GetOemLED(16)<>0 Then ' Check for Machine Coordinates
+	Message "Please change to working coordinates"
+	SetOEMDRO(59,XScale)
+	SetOEMDRO(60,YScale)
+	SetOEMDRO(61,ZScale)
+	Sleep(250)
+	Exit Sub ' Exit if in Machine Coordinates
+End If
+
+If GetOemLED(825)<>0 Then
+	Message "Probe is active! Check connection and try again"
+	Call SetOEMDRO(59,XScale)
+	Call SetOEMDRO(60,YScale)
+	Call SetOEMDRO(61,ZScale)
+	Sleep(250)
+	Exit Sub ' Exit if probe is tripped
+End If
+
+If APos<>0 Then
+	Message "A-Achse steht nicht auf 0, X+ Y+ Tasten nur in G53 A0 möglich"
+	Call SetOEMDRO(59,XScale)
+	Call SetOEMDRO(60,YScale)
+	Call SetOEMDRO(61,ZScale)
+	Sleep(250)
+	Exit Sub ' Exit if A <> 0
+End If
+
+
+
+'main working
+
+	'G43 Aktivieren um Längenkorrektur mit zu berücksichtigen
+	Code "G43"
+	
+	'Abfrage Taster eingeschalten
+	MachMsg("Ist der Taster eingeschalten", "Abfrage Taster Status", 0)
+	
+	'Startpossition im G53 speichern
+	XStartABS = GetOEMDRO(83)
+	YStartABS = GetOEMDRO(84)
+	ZStartABS = GetOEMDRO(85)
+	
+	
+	
+	
+	
+	'Safe Go to probe position
+	If Not SafeMoveX(-XAbst,FRate1) Then
+		Message "Taster auserhalb von Zyklus ausgelenkt"
+		Exit Sub 
+	End If
+	
+	'Probe Y+
+	YHit=ProbeY(1,DMax,Latch,FRate1,FRate2,FRate3,YSoll,ToolR)
+	If YHit=999999 Then 
+		Exit Sub 
+	End If
+	
+	
+	
+	
+	'Safe back to start position
+	If Not SafeMoveZ(ZSaveInk,FRate1) Then 
+		Message "Taster auserhalb von Zyklus ausgelenkt"
+		Exit Sub 
+	End If
+	
+	'Move to X- start position
+	If Not SafeMoveXY(XAbst,-YHit+YAbst,FRate1) Then 
+		Message "Taster auserhalb von Zyklus ausgelenkt"
+		Exit Sub 
+	End If
+	
+	If Not SafeMoveZ((-ZSaveInk),FRate3) Then 
+		Message "Taster auserhalb von Zyklus ausgelenkt"
+		Exit Sub 
+	End If
+	
+	
+	
+	'Probe X-
+	XHit=ProbeX(-1,DMax,Latch,FRate1,FRate2,FRate3,XSoll,ToolR)
+	If XHit=999999 Then 
+		Exit Sub 
+	End If
+	
+	
+	
+	
+
+	'Safe move to corner position
+	If Not SafeMoveZ(ZSaveInk,FRate3) Then 
+		Message "Taster auserhalb von Zyklus ausgelenkt"
+		Exit Sub 
+	End If
+	
+	XEndABS = GetOEMDRO(83)
+	YEndABS = GetOEMDRO(84)
+	XVersInk = Abs(XStartABS-XEndABS)
+	YVersInk = Abs(YStartABS-YEndABS)
+	
+	
+	If Not SafeMoveXY(XVersInk,-YVersInk,FRate1) Then 
+		Message "Taster auserhalb von Zyklus ausgelenkt"
+		Exit Sub 
+	End If
+
+
+'epilog
+
+SetOEMDRO(59,XScale)
+SetOEMDRO(60,YScale)
+SetOEMDRO(61,ZScale)
+Sleep(250)
+
+
+Message "Kanten wurde auf X: " & XSoll & " und Y: " & YSoll & " gesetzt."
+
+End Sub
+
+
+'Functions
+
+Function ProbeX(Dir,DMax,Latch,FRate1,FRate2,FRate3,XSoll,ToolR)
+	Dim Res
+    	Dim Xstart
+    	Dim Xstart1
+	ProbeX=999999
+	Xstart = GetOEMDRO(800)
+	Xstart1 = GetOEMDRO(800)
+	'Fast Probe X
+	Code "G91"
+	Code "F" & FRate1
+	Sleep(125)
+	Call WaitProbeReady()	
+	Code "G31 X" & (Dir*DMax)
+	While IsMoving()
+	Wend
+	Res = GetOEMDRO(800)
+'	PushMSG("Res=" & Res &", Xstart=" & Xstart & ", DMax=" & DMax & ", FRate1=" & FRate1)
+	If Abs(Res - Xstart - Dir*DMax) < 0.01 Then
+		Message "Error: G31 X search finished without making contact"
+		Message "Manually return to the starting position and repeat the search"
+		Exit Function 
+	End If 
+	'Move back
+	Code "G01 X" & -Dir*Latch & "F" & FRate3
+	While IsMoving()
+	Wend
+	Call WaitProbeReady()	
+	'Latch Probe X
+	Xstart = GetOEMDRO(800)
+	Code "F" & FRate2
+	Sleep(125)
+	Code "G31 X" & Dir*Latch*2
+	While IsMoving()
+	Wend
+	'Save result
+	Res = GetOEMDRO(800)
+	If Abs(Res - Xstart - Dir*Latch*2) < 0.01 Then
+		Message("Error: G31 X latch finished without making contact")
+		Message("Manually return to the starting position and repeat the search")
+		Exit Function 
+	End If 
+	SetOEMDRO(800, XSoll+ToolR) 
+	Sleep(150)
+	Code "G01 X" & -Dir*Latch & "F" & FRate3
+	While IsMoving()
+	Wend
+	Res = Res-Xstart1
+	ProbeX=Res
+End Function
+
+Function ProbeY(Dir,DMax,Latch,FRate1,FRate2,FRate3,YSoll,ToolR)
+	Dim Res
+    	Dim Ystart
+    	Dim Ystart1
+	ProbeY=999999
+	Ystart = GetOEMDRO(801)
+	Ystart1 = GetOEMDRO(801)
+	'Fast Probe Y
+	Code "G91"
+	Code "F" & FRate1
+	Sleep(125)
+	Call WaitProbeReady()	
+	Code "G31 Y" & (Dir*DMax)
+	While IsMoving()
+	Wend
+	Res = GetOEMDRO(801)
+'	PushMSG("Res=" & Res &", Ystart=" & Ystart & ", DMax=" & DMax & ", FRate1=" & FRate1)
+	If Abs(Res - Ystart - Dir*DMax) < 0.01 Then
+		Message "Error: G31 Y search finished without making contact"
+		Message "Manually return to the starting position and repeat the search"
+		Exit Function 
+	End If 
+	'Move back
+	Code "G01 Y" & -Dir*Latch & "F" & FRate3
+	While IsMoving()
+	Wend
+	Call WaitProbeReady()	
+	'Latch Probe Y
+	Ystart = GetOEMDRO(801)
+	Code "F" & FRate2
+	Sleep(125)
+	Code "G31 Y" & Dir*Latch*2
+	While IsMoving()
+	Wend
+	'Save result
+	Res = GetOEMDRO(801)
+	If Abs(Res - Ystart - Dir*Latch*2) < 0.01 Then
+		Message "Error: G31 Y latch finished without making contact"
+		Message "Manually return to the starting position and repeat the search"
+		Exit Function 
+	End If 
+	SetOEMDRO(801, YSoll-ToolR)
+	Sleep(150)
+	Code "G01 Y" & -Dir*Latch & "F" & FRate3
+	While IsMoving()
+	Wend
+	Res = Res-Ystart1
+	ProbeY=Res
+End Function
+
+Function SafeMoveX(X1, F1) As Boolean 'return 1 (error) if probe tripped
+    	Dim Xstart
+	SafeMoveX=True
+	Xstart = GetOEMDRO(83)
+	Code "G91"
+	Code "F" & F1
+	Sleep(125)
+	Call WaitProbeReady()	
+	Code "G31 X" & X1
+	While IsMoving()
+	Wend
+	XHit = GetOEMDRO(83)
+	If Abs(XHit - Xstart - X1) > 0.01 Then
+		SafeMoveX=False
+		Message "Error! Probe tripped during X movement"
+	End If 
+End Function
+
+Function SafeMoveY(Y1, F1) As Boolean 'return 1 (error) if probe tripped
+    	Dim Ystart
+	SafeMoveY=True
+	Ystart = GetOEMDRO(84)
+	Code "G91"
+	Code "F" & F1
+	Sleep(125)
+	Call WaitProbeReady()	
+	Code "G31 Y" & Y1
+	While IsMoving()
+	Wend
+	YHit = GetOEMDRO(84)
+	If Abs(YHit - Ystart - Y1) > 0.01 Then
+		SafeMoveY=False
+		Message "Error! Probe tripped during Y movement"
+	End If 
+End Function
+
+Function SafeMoveXY(X1, Y1, F1) As Boolean 'return 1 (error) if probe tripped
+    	Dim Xstart
+    	Dim Ystart
+	SafeMoveXY=True
+	Xstart = GetOEMDRO(83)
+	Ystart = GetOEMDRO(84)
+	Code "G91"
+	Code "F" & F1
+	Sleep(125)
+	Call WaitProbeReady()	
+	Code "G31 X" & X1 & "Y" & Y1
+	While IsMoving()
+	Wend
+	XHit = GetOEMDRO(83)
+	YHit = GetOEMDRO(84)
+'	PushMSG("XHit=" & XHit &", Xstart=" & Xstart & ", X1=" & X1 & ", Ftmp=" & Ftmp)
+'	PushMSG("XHit - Xstart - X1=" & XHit - Xstart - X1)
+'	PushMSG("YHit=" & YHit &", Ystart=" & Ystart & ", Y1=" & Y1 & ", Ftmp=" & Ftmp)
+'	PushMSG("YHit - Ystart - Y1=" & YHit - Ystart - Y1)
+	If (Abs(XHit - Xstart - X1) > 0.01) Or (Abs(YHit - Ystart - Y1) > 0.01) Then
+		SafeMoveXY=False
+		Message "Error! Probe tripped during XY movement"
+	End If 
+End Function
+
+
+Function SafeMoveZ(Z1, F1) As Boolean 'return 1 (error) if probe tripped
+    	Dim Zstart
+	SafeMoveZ=True
+	Zstart = GetOEMDRO(85)
+	Code "G91"
+	Code "F" & F1
+	Sleep(125)
+	Call WaitProbeReady()	
+	Code "G31 Z" & Z1
+	While IsMoving()
+	Sleep(100)
+	Wend
+	ZHit = GetOEMDRO(85)
+	If Abs(ZHit - Zstart - Z1) > 0.01 Then
+		SafeMoveZ=False
+		Message "Error! Probe tripped during Z movement"
+	End If 
+End Function
+
+   
+Sub WaitProbeReady()
+	While GetOemLED(825)
+		Sleep(100)
+	Wend
+End Sub
+
+ 
+
+        
+
+
