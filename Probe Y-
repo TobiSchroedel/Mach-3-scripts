@@ -1,0 +1,193 @@
+Sub Main()
+
+' Y- Probing Script
+' Author Schrödel
+
+
+
+Dim FRate1, FRate2, FRate3
+Dim ToolNo
+Dim ToolD
+Dim ToolR
+Dim WZL
+
+Dim APos
+
+Dim YStartABS
+Dim YHit
+Dim YSoll
+Dim YSollVers
+
+Dim YScale
+
+
+
+'Init vars
+FRate1 = 400
+FRate2 = 50
+FRate3 = 150
+ToolNo = GetCurrentTool()
+ToolD = GetToolParam(ToolNo,1)
+ToolR = ToolD/2
+APos = GetOEMDRO(86) 'Maschienen Koordinaten A-Achse
+
+'Temporary save all Axis Scale factors
+YScale = GetOEMDRO(60)
+
+'Set Y Scale to 1
+SetOEMDRO(60,1)
+Sleep(250)
+
+
+'Check for Errors
+
+'Check if Maschine is Reverenced
+If GetOEMLed(807) Then 'X Achse
+	DoOEMButton(1003) 'Stop
+	DoOEMButton(1002) 'G-Code Rewind
+	Sleep(150)
+	Message( "X Achse nicht reverenziert" )
+	Sleep(150)
+	End
+End If
+
+If GetOEMLed(808) Then 'Y Achse
+	DoOEMButton(1003) 'Stop
+	DoOEMButton(1002) 'G-Code Rewind
+	Sleep(150)
+	Message( "Y Achse nicht reverenziert" )
+	Sleep(150)
+	End
+End If
+
+If GetOEMLed(809) Then 'Z Achse
+	DoOEMButton(1003) 'Stop
+	DoOEMButton(1002) 'G-Code Rewind
+	Sleep(150)
+	Message( "Z Achse nicht reverenziert" )
+	Sleep(150)
+	End
+End If
+
+If GetOEMLed(810) Then 'A Achse
+	DoOEMButton(1003) 'Stop
+	DoOEMButton(1002) 'G-Code Rewind
+	Sleep(150)
+	Message( "A Achse nicht reverenziert" )
+	Sleep(150)
+	End
+End If
+
+If GetOEMLed(811) Then 'B Achse
+	DoOEMButton(1003) 'Stop
+	DoOEMButton(1002) 'G-Code Rewind
+	Sleep(150)
+	Message( "B Achse nicht reverenziert" )
+	Sleep(150)
+	End
+End If
+
+If GetOEMDRO(824)<>1 Then
+Message "Taster nicht in Spindel, Vorgang Abgebrochen."
+Exit Sub
+End If
+
+If GetOemLED(16)<>0 Then ' Check for Machine Coordinates
+Message "Maschinen Koordinaten Aktiv, bitte deaktivieren"
+SetOEMDRO(60,YScale)
+Sleep(250)
+Exit Sub ' Exit if in Machine Coordinates
+End If
+
+If GetOemLED(825)<>0 Then
+Message "Probe is active! Check connection and try again"
+Call SetOEMDRO(60,YScale)
+Sleep(250)
+Exit Sub ' Exit if probe is tripped
+End If
+
+If APos<>0 Then
+Message "A-Achse steht nicht auf 0, Y Tasten nur in G53 A0 möglich"
+Call SetOEMDRO(60,YScale)
+Sleep(250)
+Exit Sub ' Exit if A <> 0
+End If
+
+
+'main working
+
+	'G43 Aktivieren um Längenkorrektur mit zu berücksichtigen
+	Code "G43"
+	
+	'Abfrage Taster eingeschalten
+	MachMsg("Ist der Taster eingeschalten", "Abfrage Taster Status", 0)
+	
+	'Abfrage X Soll
+	YSoll = Question("Bitte Y Soll eingeben:")
+
+	'Save X start position
+	YStartABS = GetOEMDRO(84)
+	
+
+	'Probe X-
+	Code "G91"
+	Code "F" & FRate1
+	Sleep(125)
+	Call WaitProbeReady()	
+	Code "G31 Y-50"
+	While IsMoving()
+	Wend
+	Code "G91 G01 Y2 F" & FRate3 'Abheben
+	While IsMoving()
+	Wend
+	Code "G31 Y-5 F" & FRate2 'langsammes Antasten
+	While IsMoving()
+	Wend
+	
+	
+	If GetOemLED(16)<>0 Then ' Check for Machine Coordinates
+	DoOEMButton (256) 'Falls Maschinen Koordinaten aktiv sind, umschalten auf Work
+	Sleep(250)
+	End If 
+		
+	
+	YSollVers = YSoll+ToolR
+	
+	
+	Code "G43" 'Längen korrektur aktivieren
+	Sleep(250)
+	SetOEMDRO(801, YSollVers) 'Sollwert inkl Radiusversatz als X setzen
+	Sleep(150)
+
+	Code "G91 G01 Y2 F" & FRate3 'Abheben
+	While IsMoving()
+	Wend
+	Code "G90 G53 G01 Y" & YStartABS & " F" & FRate1 'Auf Ausgangspunkt fahren
+	While IsMoving()
+	Wend
+	Code "G90"
+	
+	'Message "YSollVers: " & YSollVers
+	'Sleep(250)
+	Message "Kannte wurde auf Y " & YSoll & " gesetzt"
+	Sleep(250)
+	'Message "ToolNo: " & ToolNo & "ToolD: " & ToolD & "ToolR: " & ToolR 
+
+'epilog
+
+SetOEMDRO(60,YScale)
+Sleep(250)
+
+End Sub
+
+
+'Functions
+
+   
+Sub WaitProbeReady()
+	While GetOemLED(825)
+		Sleep(100)
+	Wend
+End Sub   
+      
+ 
